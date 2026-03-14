@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>CRUD Procesos</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 20px; }
+    input, button { padding: 8px; margin: 4px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border-bottom: 1px solid #ddd; text-align: left; }
+    th { background: #f5f5f5; }
+    .hash { font-family: monospace; font-size: 11px; }
+    .error { color: red; }
+    button.primary { background: #1976d2; color: white; border: none; cursor: pointer; }
+    button.secondary { background: #eee; border: none; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>CRUD Procesos (funcional)</h1>
+
+  <h2>Nuevo Paso</h2>
+  <div>
+    <input id="name" placeholder="Nombre" style="width:200px">
+    <input id="description" placeholder="Descripción" style="width:250px">
+    <input id="order" type="number" placeholder="Orden" style="width:70px" value="1">
+    <button class="primary" onclick="crearProceso()">Crear</button>
+    <span id="error" class="error"></span>
+  </div>
+
+  <h2>Procesos</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>Nombre</th><th>Descripción</th><th>Hash actual</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tabla-procesos"></tbody>
+  </table>
+
+  <div id="historial-section" style="display:none">
+    <h2>Historial del registro de <span id="nombre-proceso"></span></h2>
+    <table>
+      <thead>
+        <tr><th>Acción</th><th>Hash</th><th>Hash Anterior</th><th>Fecha</th></tr>
+      </thead>
+      <tbody id="tabla-historial"></tbody>
+    </table>
+  </div>
+
+  <script>
+    const API = 'http://localhost:3000/api/processes';
+
+    async function cargarProcesos() {
+      const res = await fetch(API);
+      const data = await res.json();
+      const tbody = document.getElementById('tabla-procesos');
+      tbody.innerHTML = data.map(p => `
+        <tr>
+          <td>${p.order}</td>
+          <td>${p.name}</td>
+          <td>${p.description || '-'}</td>
+          <td class="hash">${p.currentHash?.slice(0,20)}...</td>
+          <td><button class="secondary" onclick="verHistorial(${p.id}, '${p.name}')">Version</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('order').value = data.length + 1;
+    }
+
+    async function crearProceso() {
+      const name = document.getElementById('name').value;
+      const description = document.getElementById('description').value;
+      const order = parseInt(document.getElementById('order').value);
+      const errorEl = document.getElementById('error');
+
+      if (!name || !order) { errorEl.textContent = 'Nombre y orden son requeridos'; return; }
+      errorEl.textContent = '';
+
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, description, order })
+      });
+
+      if (!res.ok) { errorEl.textContent = 'Error al crear proceso'; return; }
+      document.getElementById('name').value = '';
+      document.getElementById('description').value = '';
+      cargarProcesos();
+    }
+
+    async function verHistorial(id, nombre) {
+      const res = await fetch(`${API}/${id}/history`);
+      const data = await res.json();
+      document.getElementById('nombre-proceso').textContent = nombre;
+      document.getElementById('historial-section').style.display = 'block';
+      document.getElementById('tabla-historial').innerHTML = data.map(h => `
+        <tr>
+          <td><strong>${h.action}</strong></td>
+          <td class="hash">${h.hash?.slice(0,20)}...</td>
+          <td class="hash">${h.previousHash?.slice(0,20)}...</td>
+          <td>${new Date(h.createdAt).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+
+    cargarProcesos();
+  </script>
+</body>
+</html>
